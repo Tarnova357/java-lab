@@ -1,0 +1,34 @@
+server:
+  port: 8080
+
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            client-id: spring-client
+            client-secret: 0xnFYAjdvuwrBGYSloUZrqaToGdOeWRccYpPdw4y5LKPimUCs4rGyQmrF96lqsQ0zPlbPnRJbM8m1dPogeHUJL
+            scope: openid, profile, email
+            authorization-grant-type: authorization_code
+        provider:
+          keycloak:
+            issuer-uri: http://localhost:8081/realms/java-lab-realm
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8081/realms/java-lab-realm
+  application:
+    name: Java_Lab
+  datasource:
+    url: jdbc:mysql://localhost:3306/asset_hub_db?serverTimezone=UTC
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    open-in-view: false
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    enabled: true

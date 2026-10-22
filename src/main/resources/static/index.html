@@ -1,0 +1,563 @@
+﻿<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Asset Logistics Platform</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background: #f8fafc; color: #0f172a; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 20px; }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .badge-admin { background: #fee2e2; color: #991b1b; }
+        .badge-user { background: #e0f2fe; color: #075985; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 20px; }
+        .card { background: white; padding: 18px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
+        .sub-block { background: #f8fafc; padding: 12px; border-radius: 6px; margin-bottom: 14px; border: 1px dashed #cbd5e1; }
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 13px; }
+        th, td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
+        th { background-color: #f1f5f9; }
+        .form-group { margin-bottom: 8px; }
+        label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 3px; color: #475569; }
+        input, select { width: 100%; padding: 7px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box; }
+        button { padding: 7px 12px; cursor: pointer; border-radius: 4px; border: none; background: #2563eb; color: white; font-weight: 500; margin-right: 4px; }
+        button:hover { background: #1d4ed8; }
+        button:disabled { background: #94a3b8; cursor: not-allowed; }
+        button.btn-danger { background: #dc2626; }
+        button.btn-danger:hover { background: #b91c1c; }
+        .status-msg { margin-top: 6px; font-size: 12px; font-weight: bold; }
+        .status-success { color: #16a34a; }
+        .status-error { color: #dc2626; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <h2 style="margin: 0 0 4px 0;">Virtual Asset Logistics Platform</h2>
+        <span id="roleBadge" class="badge">Визначення ролі...</span>
+    </div>
+    <div id="userProfile">Завантаження сесії...</div>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <h3>1. Акаунти-сховища (Storage Accounts)</h3>
+
+        <div class="sub-block">
+            <h4 style="margin-top:0;">Створити новий акаунт (ADMIN)</h4>
+            <div class="form-group">
+                <label>Username:</label>
+                <input type="text" id="accCreateUsername" placeholder="bot_storage_01">
+            </div>
+            <div class="form-group">
+                <label>Платформа:</label>
+                <input type="text" id="accCreatePlatform" placeholder="ROBLOX / STEAM / EPIC">
+            </div>
+            <div class="form-group">
+                <label>Статус:</label>
+                <select id="accCreateStatus">
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="FROZEN">FROZEN</option>
+                    <option value="BANNED">BANNED</option>
+                </select>
+            </div>
+            <button onclick="createAccount(event)">Створити</button>
+            <div id="accCreateMsg" class="status-msg"></div>
+        </div>
+
+        <div class="sub-block">
+            <h4 style="margin-top:0;">Оновити акаунт за ID (ADMIN)</h4>
+            <div class="form-group">
+                <label>ID для оновлення:</label>
+                <input type="number" id="accUpdateId" placeholder="Введіть ID">
+            </div>
+            <div class="form-group">
+                <label>Новий Username:</label>
+                <input type="text" id="accUpdateUsername">
+            </div>
+            <div class="form-group">
+                <label>Нова Платформа:</label>
+                <input type="text" id="accUpdatePlatform">
+            </div>
+            <div class="form-group">
+                <label>Новий Статус:</label>
+                <select id="accUpdateStatus">
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="FROZEN">FROZEN</option>
+                    <option value="BANNED">BANNED</option>
+                </select>
+            </div>
+            <button onclick="updateAccount(event)">Оновити</button>
+            <div id="accUpdateMsg" class="status-msg"></div>
+        </div>
+
+        <div class="sub-block">
+            <h4 style="margin-top:0;">Видалити акаунт за ID (ADMIN)</h4>
+            <div class="form-group">
+                <label>ID для видалення:</label>
+                <input type="number" id="accDeleteId" placeholder="Введіть ID">
+            </div>
+            <button class="btn-danger" onclick="deleteAccount(event)">Видалити</button>
+            <div id="accDeleteMsg" class="status-msg"></div>
+        </div>
+
+        <h4>Реєстр акаунтів</h4>
+        <button onclick="fetchAccounts()">Оновити таблицю</button>
+        <table>
+            <thead>
+            <tr><th>ID</th><th>Username</th><th>Платформа</th><th>Статус</th></tr>
+            </thead>
+            <tbody id="accountsTableBody"></tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>2. Віртуальні активи на складі</h3>
+
+        <div class="sub-block">
+            <h4 style="margin-top:0;">Додати новий актив (ADMIN)</h4>
+            <div class="form-group">
+                <label>Назва:</label>
+                <input type="text" id="assetCreateName" placeholder="Diamond Pickaxe">
+            </div>
+            <div class="form-group">
+                <label>Тип активу:</label>
+                <input type="text" id="assetCreateType" placeholder="EQUIPMENT / CURRENCY">
+            </div>
+            <div class="form-group">
+                <label>Кількість:</label>
+                <input type="number" id="assetCreateAmount" min="1" value="10">
+            </div>
+            <div class="form-group">
+                <label>Платформа:</label>
+                <input type="text" id="assetCreatePlatform" placeholder="ROBLOX">
+            </div>
+            <div class="form-group">
+                <label>Ціна за од. (unitPrice):</label>
+                <input type="number" id="assetCreatePrice" step="0.1" value="5.0">
+            </div>
+            <div class="form-group">
+                <label>ID Сховища (storageAccountId):</label>
+                <input type="number" id="assetCreateStorageId" placeholder="ID сховища">
+            </div>
+            <button onclick="createAsset(event)">Додати актив</button>
+            <div id="assetCreateMsg" class="status-msg"></div>
+        </div>
+
+        <div class="sub-block">
+            <h4 style="margin-top:0;">Оновити актив за ID (ADMIN)</h4>
+            <div class="form-group">
+                <label>ID для оновлення:</label>
+                <input type="number" id="assetUpdateId" placeholder="Введіть ID">
+            </div>
+            <div class="form-group">
+                <label>Нова Назва:</label>
+                <input type="text" id="assetUpdateName">
+            </div>
+            <div class="form-group">
+                <label>Новий Тип:</label>
+                <input type="text" id="assetUpdateType">
+            </div>
+            <div class="form-group">
+                <label>Нова Кількість:</label>
+                <input type="number" id="assetUpdateAmount" min="1">
+            </div>
+            <div class="form-group">
+                <label>Нова Платформа:</label>
+                <input type="text" id="assetUpdatePlatform">
+            </div>
+            <div class="form-group">
+                <label>Нова Ціна:</label>
+                <input type="number" id="assetUpdatePrice" step="0.1">
+            </div>
+            <div class="form-group">
+                <label>ID Сховища:</label>
+                <input type="number" id="assetUpdateStorageId">
+            </div>
+            <button onclick="updateAsset(event)">Оновити</button>
+            <div id="assetUpdateMsg" class="status-msg"></div>
+        </div>
+
+        <div class="sub-block">
+            <h4 style="margin-top:0;">Видалити актив за ID (ADMIN)</h4>
+            <div class="form-group">
+                <label>ID для видалення:</label>
+                <input type="number" id="assetDeleteId" placeholder="Введіть ID">
+            </div>
+            <button class="btn-danger" onclick="deleteAsset(event)">Видалити</button>
+            <div id="assetDeleteMsg" class="status-msg"></div>
+        </div>
+
+        <h4>Таблиця залишків складу</h4>
+        <button onclick="fetchAssets()">Оновити таблицю</button>
+        <table>
+            <thead>
+            <tr><th>ID</th><th>Предмет</th><th>Тип</th><th>К-сть</th><th>Ціна</th><th>Платформа</th><th>ID Сховища</th></tr>
+            </thead>
+            <tbody id="assetsTableBody"></tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>3. Оформлення та управління замовленнями</h3>
+
+        <div class="sub-block">
+            <h4 style="margin-top:0;">Оформити доставку (USER / ADMIN)</h4>
+            <div class="form-group">
+                <label>Customer Tag:</label>
+                <input type="text" id="orderCreateTag" placeholder="Player_One">
+            </div>
+            <div class="form-group">
+                <label>ID віртуального активу:</label>
+                <input type="number" id="orderCreateAssetId" placeholder="ID товару">
+            </div>
+            <div class="form-group">
+                <label>Кількість:</label>
+                <input type="number" id="orderCreateQty" min="1" value="1">
+            </div>
+            <button onclick="createOrder(event)">Оформити</button>
+            <div id="orderCreateMsg" class="status-msg"></div>
+        </div>
+
+        <div class="sub-block">
+            <h4 style="margin-top:0;">Оновити замовлення за ID (ADMIN)</h4>
+            <div class="form-group">
+                <label>ID замовлення:</label>
+                <input type="number" id="orderUpdateId" placeholder="Введіть ID">
+            </div>
+            <div class="form-group">
+                <label>Customer Tag:</label>
+                <input type="text" id="orderUpdateTag">
+            </div>
+            <div class="form-group">
+                <label>Кількість:</label>
+                <input type="number" id="orderUpdateQty" min="1">
+            </div>
+            <div class="form-group">
+                <label>ID Активу:</label>
+                <input type="number" id="orderUpdateAssetId">
+            </div>
+            <div class="form-group">
+                <label>Статус:</label>
+                <select id="orderUpdateStatus">
+                    <option value="PENDING">PENDING</option>
+                    <option value="IN_PROGRESS">IN_PROGRESS</option>
+                    <option value="COMPLETED">COMPLETED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                </select>
+            </div>
+            <button onclick="updateOrder(event)">Оновити</button>
+            <div id="orderUpdateMsg" class="status-msg"></div>
+        </div>
+
+        <div class="sub-block">
+            <h4 style="margin-top:0;">Видалити замовлення за ID (ADMIN)</h4>
+            <div class="form-group">
+                <label>ID для видалення:</label>
+                <input type="number" id="orderDeleteId" placeholder="Введіть ID">
+            </div>
+            <button class="btn-danger" onclick="deleteOrder(event)">Видалити</button>
+            <div id="orderDeleteMsg" class="status-msg"></div>
+        </div>
+
+        <h4>Реєстр замовлень (Тільки ADMIN)</h4>
+        <button onclick="fetchOrders()">Оновити таблицю</button>
+        <table>
+            <thead>
+            <tr><th>ID</th><th>Отримувач</th><th>К-сть</th><th>Сума</th><th>Платформа</th><th>Статус</th><th>Asset ID</th></tr>
+            </thead>
+            <tbody id="ordersTableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const ACC_URL = '/api/storage-accounts';
+    const ASSET_URL = '/api/virtual-assets';
+    const ORDER_URL = '/api/orders';
+
+    window.onload = async () => {
+        await initUser();
+        fetchAccounts();
+        fetchAssets();
+        fetchOrders();
+    };
+
+    async function initUser() {
+        try {
+            const res = await fetch('/api/user');
+            if (res.ok) {
+                const user = await res.json();
+                const isAdmin = user.roles && user.roles.includes('ROLE_ADMIN');
+                const badge = document.getElementById('roleBadge');
+                badge.innerText = isAdmin ? 'ПРАВА: АДМІНІСТРАТОР (ADMIN)' : 'ПРАВА: КЛІЄНТ (USER)';
+                badge.className = 'badge ' + (isAdmin ? 'badge-admin' : 'badge-user');
+                document.getElementById('userProfile').innerHTML =
+                    `Авторизовано: <b>${user.username}</b> | <a href="/perform-logout">Вийти</a>`;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function showStatus(elementId, isSuccess, message) {
+        const el = document.getElementById(elementId);
+        el.className = 'status-msg ' + (isSuccess ? 'status-success' : 'status-error');
+        el.innerText = message;
+    }
+
+    async function handleResponse(res, statusElementId, successMessage) {
+        if (res.ok) {
+            showStatus(statusElementId, true, successMessage);
+            return true;
+        } else {
+            const data = await res.json().catch(() => null);
+            let err = 'HTTP ' + res.status;
+
+            if (data) {
+                if (Array.isArray(data.errors) && data.errors.length > 0) {
+                    err = data.errors.map(e => e.defaultMessage || e.message).filter(Boolean).join('; ');
+                } else if (data.message && data.message.trim() !== '') {
+                    err = data.message;
+                } else if (data.detail && data.detail.trim() !== '') {
+                    err = data.detail;
+                } else if (data.error) {
+                    err = data.error;
+                }
+            }
+
+            showStatus(statusElementId, false, `[Error ${res.status}]: ${err}`);
+            return false;
+        }
+    }
+
+    async function fetchAccounts() {
+        const res = await fetch(ACC_URL);
+        const tbody = document.getElementById('accountsTableBody');
+        tbody.innerHTML = '';
+        if (!res.ok) {
+            tbody.innerHTML = '<tr><td colspan="4" style="color:red; text-align:center;">Access denied (403)</td></tr>';
+            return;
+        }
+        const data = await res.json();
+        data.forEach(acc => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${acc.id}</td><td><b>${acc.username}</b></td><td>${acc.platform}</td><td>${acc.status}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function createAccount(e) {
+        const btn = (e && e.target) ? e.target : (window.event ? window.event.target : null);
+        if (btn) btn.disabled = true;
+        try {
+            const username = document.getElementById('accCreateUsername').value.trim();
+            const platform = document.getElementById('accCreatePlatform').value.trim();
+            const status = document.getElementById('accCreateStatus').value;
+            const res = await fetch(ACC_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, platform, status })
+            });
+            if (await handleResponse(res, 'accCreateMsg', 'Account created successfully')) {
+                fetchAccounts();
+            }
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function updateAccount(e) {
+        const btn = (e && e.target) ? e.target : (window.event ? window.event.target : null);
+        if (btn) btn.disabled = true;
+        try {
+            const id = document.getElementById('accUpdateId').value;
+            const username = document.getElementById('accUpdateUsername').value.trim();
+            const platform = document.getElementById('accUpdatePlatform').value.trim();
+            const status = document.getElementById('accUpdateStatus').value;
+            if (!id) { showStatus('accUpdateMsg', false, 'Please enter ID!'); return; }
+            const res = await fetch(`${ACC_URL}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, platform, status })
+            });
+            if (await handleResponse(res, 'accUpdateMsg', 'Account updated successfully')) {
+                fetchAccounts();
+            }
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function deleteAccount(e) {
+        const btn = (e && e.target) ? e.target : (window.event ? window.event.target : null);
+        if (btn) btn.disabled = true;
+        try {
+            const id = document.getElementById('accDeleteId').value;
+            if (!id) { showStatus('accDeleteMsg', false, 'Please enter ID!'); return; }
+            const res = await fetch(`${ACC_URL}/${id}`, { method: 'DELETE' });
+            if (await handleResponse(res, 'accDeleteMsg', `Account with ID ${id} deleted`)) {
+                fetchAccounts();
+            }
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function fetchAssets() {
+        const res = await fetch(ASSET_URL);
+        const tbody = document.getElementById('assetsTableBody');
+        tbody.innerHTML = '';
+        if (!res.ok) {
+            tbody.innerHTML = '<tr><td colspan="7" style="color:red; text-align:center;">Access denied (403)</td></tr>';
+            return;
+        }
+        const data = await res.json();
+        data.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${item.id}</td><td><b>${item.name}</b></td><td>${item.assetType}</td><td>${item.amount}</td><td>$${item.unitPrice}</td><td>${item.platform}</td><td>${item.storageAccountId}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function createAsset(e) {
+        const btn = (e && e.target) ? e.target : (window.event ? window.event.target : null);
+        if (btn) btn.disabled = true;
+        try {
+            const name = document.getElementById('assetCreateName').value.trim();
+            const assetType = document.getElementById('assetCreateType').value.trim();
+            const amount = Number(document.getElementById('assetCreateAmount').value);
+            const platform = document.getElementById('assetCreatePlatform').value.trim();
+            const unitPrice = Number(document.getElementById('assetCreatePrice').value);
+            const storageAccountId = Number(document.getElementById('assetCreateStorageId').value);
+            const res = await fetch(ASSET_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, assetType, amount, platform, unitPrice, storageAccountId })
+            });
+            if (await handleResponse(res, 'assetCreateMsg', 'Asset added successfully')) {
+                fetchAssets();
+            }
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function updateAsset(e) {
+        const btn = (e && e.target) ? e.target : (window.event ? window.event.target : null);
+        if (btn) btn.disabled = true;
+        try {
+            const id = document.getElementById('assetUpdateId').value;
+            if (!id) { showStatus('assetUpdateMsg', false, 'Please enter ID!'); return; }
+            const name = document.getElementById('assetUpdateName').value.trim();
+            const assetType = document.getElementById('assetUpdateType').value.trim();
+            const amount = Number(document.getElementById('assetUpdateAmount').value);
+            const platform = document.getElementById('assetUpdatePlatform').value.trim();
+            const unitPrice = Number(document.getElementById('assetUpdatePrice').value);
+            const storageAccountId = Number(document.getElementById('assetUpdateStorageId').value);
+            const res = await fetch(`${ASSET_URL}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, assetType, amount, platform, unitPrice, storageAccountId })
+            });
+            if (await handleResponse(res, 'assetUpdateMsg', 'Asset updated successfully')) {
+                fetchAssets();
+            }
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function deleteAsset(e) {
+        const btn = (e && e.target) ? e.target : (window.event ? window.event.target : null);
+        if (btn) btn.disabled = true;
+        try {
+            const id = document.getElementById('assetDeleteId').value;
+            if (!id) { showStatus('assetDeleteMsg', false, 'Please enter ID!'); return; }
+            const res = await fetch(`${ASSET_URL}/${id}`, { method: 'DELETE' });
+            if (await handleResponse(res, 'assetDeleteMsg', `Asset with ID ${id} deleted`)) {
+                fetchAssets();
+            }
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function fetchOrders() {
+        const res = await fetch(ORDER_URL);
+        const tbody = document.getElementById('ordersTableBody');
+        tbody.innerHTML = '';
+        if (!res.ok) {
+            tbody.innerHTML = '<tr><td colspan="7" style="color:red; text-align:center;">Access denied (ADMIN only)</td></tr>';
+            return;
+        }
+        const data = await res.json();
+        data.forEach(o => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${o.id}</td><td><b>${o.customerTag}</b></td><td>${o.quantity}</td><td>$${o.totalPrice}</td><td>${o.platform}</td><td>${o.status}</td><td>${o.virtualAssetId}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function createOrder(e) {
+        const btn = (e && e.target) ? e.target : (window.event ? window.event.target : null);
+        if (btn) btn.disabled = true;
+        try {
+            const customerTag = document.getElementById('orderCreateTag').value.trim();
+            const virtualAssetId = Number(document.getElementById('orderCreateAssetId').value);
+            const quantity = Number(document.getElementById('orderCreateQty').value);
+            const res = await fetch(ORDER_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customerTag, virtualAssetId, quantity })
+            });
+            if (await handleResponse(res, 'orderCreateMsg', 'Order created successfully')) {
+                fetchAssets();
+                fetchOrders();
+            }
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function updateOrder(e) {
+        const btn = (e && e.target) ? e.target : (window.event ? window.event.target : null);
+        if (btn) btn.disabled = true;
+        try {
+            const id = document.getElementById('orderUpdateId').value;
+            if (!id) { showStatus('orderUpdateMsg', false, 'Please enter ID!'); return; }
+            const customerTag = document.getElementById('orderUpdateTag').value.trim();
+            const quantity = Number(document.getElementById('orderUpdateQty').value);
+            const virtualAssetId = Number(document.getElementById('orderUpdateAssetId').value);
+            const status = document.getElementById('orderUpdateStatus').value;
+            const res = await fetch(`${ORDER_URL}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customerTag, quantity, virtualAssetId, status })
+            });
+            if (await handleResponse(res, 'orderUpdateMsg', 'Order updated successfully')) {
+                fetchOrders();
+                fetchAssets();
+            }
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function deleteOrder(e) {
+        const btn = (e && e.target) ? e.target : (window.event ? window.event.target : null);
+        if (btn) btn.disabled = true;
+        try {
+            const id = document.getElementById('orderDeleteId').value;
+            if (!id) { showStatus('orderDeleteMsg', false, 'Please enter ID!'); return; }
+            const res = await fetch(`${ORDER_URL}/${id}`, { method: 'DELETE' });
+            if (await handleResponse(res, 'orderDeleteMsg', `Order with ID ${id} deleted`)) {
+                fetchOrders();
+            }
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+</script>
+</body>
+</html>

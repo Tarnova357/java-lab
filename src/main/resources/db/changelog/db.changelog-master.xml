@@ -1,0 +1,81 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+    <changeSet id="1-create-storage-account" author="developer">
+        <createTable tableName="storage_account">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="username" type="VARCHAR(255)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="platform" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(50)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="2-create-virtual-asset-table" author="developer">
+        <createTable tableName="virtual_asset">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="asset_type" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="amount" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="platform" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="unit_price" type="DOUBLE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="storage_account_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_asset_storage_account"
+                             references="storage_account(id)"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="3-create-delivery-order-table" author="developer">
+        <createTable tableName="delivery_order">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="customer_tag" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="quantity" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="total_price" type="DOUBLE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="platform" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="virtual_asset_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_order_virtual_asset"
+                             references="virtual_asset(id)"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>

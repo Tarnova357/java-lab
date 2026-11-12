@@ -1,6 +1,7 @@
 package com.example.java_lab.controller;
 
 import com.example.java_lab.annotation.IdempotencyKey;
+import com.example.java_lab.annotation.IdempotentRequest;
 import com.example.java_lab.annotation.PostCreatedJsonMapping;
 import com.example.java_lab.dto.DeliveryOrderDto;
 import com.example.java_lab.service.DeliveryOrderService;
@@ -23,16 +24,23 @@ public class DeliveryOrderController {
 
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @PostCreatedJsonMapping
+    @IdempotentRequest
     public DeliveryOrderDto create(@Valid @RequestBody DeliveryOrderDto dto,
                                    @IdempotencyKey String idempotencyKey) {
         log.info("Оформлення замовлення [Idempotency-Key: {}] для клієнта: {}", idempotencyKey, dto.getCustomerTag());
         return service.create(dto);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @GetMapping
     public ResponseEntity<List<DeliveryOrderDto>> getAll() {
         return ResponseEntity.ok(service.getAll());
+    }
+
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @GetMapping("/self-invocation")
+    public ResponseEntity<List<DeliveryOrderDto>> getAllSelfInvocation() {
+        return ResponseEntity.ok(service.getAllViaSelfInvocation());
     }
 
     @PreAuthorize("hasRole('ADMIN')")

@@ -1,5 +1,7 @@
 package com.example.java_lab.service;
 
+import com.example.java_lab.annotation.MaskCustomerTag;
+import com.example.java_lab.annotation.VerifyActiveStorage;
 import com.example.java_lab.dto.DeliveryOrderDto;
 import com.example.java_lab.entity.DeliveryOrder;
 import com.example.java_lab.entity.VirtualAsset;
@@ -23,6 +25,7 @@ public class DeliveryOrderService {
     private final DeliveryOrderMapper mapper;
 
     @Transactional
+    @VerifyActiveStorage
     public DeliveryOrderDto create(DeliveryOrderDto dto) {
         VirtualAsset asset = assetRepository.findById(dto.getVirtualAssetId())
                 .orElseThrow(() -> new RuntimeException("Virtual asset not found with id: " + dto.getVirtualAssetId()));
@@ -43,12 +46,18 @@ public class DeliveryOrderService {
         return mapper.toDto(orderRepository.save(entity));
     }
 
+    @MaskCustomerTag(visiblePrefix = 2, visibleSuffix = 2, bypassForAdmin = true)
     public List<DeliveryOrderDto> getAll() {
         return orderRepository.findAll().stream()
                 .map(mapper::toDto)
                 .collect(Collectors.toList());
     }
 
+    public List<DeliveryOrderDto> getAllViaSelfInvocation() {
+        return this.getAll();
+    }
+
+    @MaskCustomerTag(visiblePrefix = 2, visibleSuffix = 2, bypassForAdmin = true)
     public DeliveryOrderDto getById(Long id) {
         DeliveryOrder entity = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Order not found with id: " + id));

@@ -1,0 +1,45 @@
+﻿### 0. Отримання JWT-токена з Keycloak (запускати першим)
+POST http://localhost:8081/realms/java-lab-realm/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=spring-client&client_secret=0xnFYAjdvuwrBGYSloUZrqaToGdOeWRccYpPdw4y5LKPimUCs4rGyQmrF96lqsQ0zPlbPnRJbM8m1dPogeHUJL&username=user2&password=1212
+
+> {%
+    client.test("Token received", function () {
+        client.assert(response.status === 200, "Keycloak error: " + JSON.stringify(response.body));
+        client.assert(response.body.access_token !== undefined, "No access_token in response");
+    });
+    if (response.body && response.body.access_token) {
+        client.global.set("auth_token", response.body.access_token);
+    }
+%}
+
+### 2. Fire-and-Forget: створення замовлення та фонова генерація ZIP-квитанції
+POST http://localhost:8080/api/orders
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+Idempotency-Key: async-demo-order-1
+
+{
+  "customerTag": "Async_Gamer",
+  "virtualAssetId": 3,
+  "quantity": 1
+}
+
+> {%
+    if (response.body && response.body.id) {
+        client.global.set("order_id", response.body.id);
+    }
+%}
+
+### 3. Паралельні @Async запити (НБУ API + Keycloak OIDC) та об'єднання через thenCombine
+GET http://localhost:8080/api/orders/{{order_id}}/settlement
+Authorization: Bearer {{auth_token}}
+
+### 4. Тайм-аут очікування (orTimeout) та резервне значення (handle / exceptionally)
+GET http://localhost:8080/api/orders/{{order_id}}/settlement?timeoutMs=5
+Authorization: Bearer {{auth_token}}
+
+### 5. Переповнення малого пулу потоків (TaskRejectedException -> 503 Service Unavailable)
+POST http://localhost:8080/api/orders/stress-queue?requestsCount=6
+Authorization: Bearer {{auth_token}}

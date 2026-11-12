@@ -68,4 +68,13 @@ public class GlobalExceptionHandler {
         response.put("message", ex.getMessage());
         return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
     }
+
+    @ExceptionHandler(org.springframework.core.task.TaskRejectedException.class)
+    public ResponseEntity handleTaskRejectedException(
+            org.springframework.core.task.TaskRejectedException ex) {
+        Map<String, String> response = new HashMap<>();
+        response.put("error", "Service Unavailable");
+        response.put("message", "Черга асинхронних задач переповнена. Будь ласка, повторіть спробу пізніше.");
+        return new ResponseEntity<>(response, HttpStatus.SERVICE_UNAVAILABLE);
+    }
 }

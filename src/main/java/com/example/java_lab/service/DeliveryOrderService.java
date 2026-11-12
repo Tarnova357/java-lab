@@ -3,6 +3,7 @@ package com.example.java_lab.service;
 import com.example.java_lab.annotation.MaskCustomerTag;
 import com.example.java_lab.annotation.VerifyActiveStorage;
 import com.example.java_lab.dto.DeliveryOrderDto;
+import com.example.java_lab.dto.OrderSettlementDto;
 import com.example.java_lab.entity.DeliveryOrder;
 import com.example.java_lab.entity.VirtualAsset;
 import com.example.java_lab.entity.enums.OrderStatus;
@@ -14,15 +15,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class DeliveryOrderService {
 
+    private static final double FALLBACK_USD_RATE = 41.50;
+
     private final DeliveryOrderRepository orderRepository;
     private final VirtualAssetRepository assetRepository;
     private final DeliveryOrderMapper mapper;
+    private final OrderLogisticsAsyncService asyncLogisticsService;
 
     @Transactional
     @VerifyActiveStorage
@@ -43,7 +49,57 @@ public class DeliveryOrderService {
         entity.setTotalPrice(asset.getUnitPrice() * dto.getQuantity());
         entity.setStatus(OrderStatus.PENDING);
 
-        return mapper.toDto(orderRepository.save(entity));
+        DeliveryOrderDto savedDto = mapper.toDto(orderRepository.save(entity));
+        asyncLogisticsService.generateSignedReceiptArchive(savedDto);
+        return savedDto;
+    }
+
+    public OrderSettlementDto calculateOrderSettlement(Long orderId, long timeoutMs) {
+        DeliveryOrderDto order = getById(orderId);
+        return calculateOrderSettlementWithUrls(
+                order,
+                asyncLogisticsService.getDefaultNbuUrl(),
+                asyncLogisticsService.getDefaultKeycloakDiscoveryUrl(),
+                timeoutMs
+        );
+    }
+
+    public OrderSettlementDto calculateOrderSettlementWithUrls(
+            DeliveryOrderDto order,
+            String nbuUrl,
+            String keycloakDiscoveryUrl,
+            long timeoutMs) {
+
+        long startTime = System.currentTimeMillis();
+
+        CompletableFuture<Double> rateFuture = asyncLogisticsService
+                .fetchLiveUsdRateFromNbu(nbuUrl, timeoutMs)
+                .orTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .exceptionally(ex -> FALLBACK_USD_RATE);
+
+        CompletableFuture<String> oidcFuture = asyncLogisticsService
+                .verifyKeycloakOidcHealth(keycloakDiscoveryUrl, timeoutMs)
+                .orTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .handle((res, ex) -> ex != null
+                        ? "FALLBACK_UNVERIFIED (" + ex.getMessage() + ")"
+                        : res);
+
+        return rateFuture.thenCombine(oidcFuture, (rate, oidcStatus) -> {
+            long elapsed = System.currentTimeMillis() - startTime;
+            double amountUsd = order.getTotalPrice() != null ? order.getTotalPrice() : 0.0;
+            double amountUah = Math.round(amountUsd * rate * 100.0) / 100.0;
+            boolean verified = oidcStatus.startsWith("ACTIVE");
+
+            return new OrderSettlementDto(
+                    order.getId(),
+                    amountUsd,
+                    rate,
+                    amountUah,
+                    oidcStatus,
+                    verified,
+                    elapsed
+            );
+        }).join();
     }
 
     @MaskCustomerTag(visiblePrefix = 2, visibleSuffix = 2, bypassForAdmin = true)
@@ -56,7 +112,6 @@ public class DeliveryOrderService {
     public List<DeliveryOrderDto> getAllViaSelfInvocation() {
         return this.getAll();
     }
-
     @MaskCustomerTag(visiblePrefix = 2, visibleSuffix = 2, bypassForAdmin = true)
     public DeliveryOrderDto getById(Long id) {
         DeliveryOrder entity = orderRepository.findById(id)

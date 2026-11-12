@@ -5,6 +5,7 @@ import com.example.java_lab.annotation.IdempotentRequest;
 import com.example.java_lab.annotation.PostCreatedJsonMapping;
 import com.example.java_lab.dto.DeliveryOrderDto;
 import com.example.java_lab.service.DeliveryOrderService;
+import com.example.java_lab.service.OrderLogisticsAsyncService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ import java.util.List;
 public class DeliveryOrderController {
 
     private final DeliveryOrderService service;
+    private final OrderLogisticsAsyncService asyncLogisticsService;
 
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @PostCreatedJsonMapping
@@ -60,5 +62,23 @@ public class DeliveryOrderController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
+    }
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @GetMapping("/{id}/settlement")
+    public ResponseEntity<com.example.java_lab.dto.OrderSettlementDto> getOrderSettlement(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "3000") long timeoutMs) {
+        return ResponseEntity.ok(service.calculateOrderSettlement(id, timeoutMs));
+    }
+
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @PostMapping("/stress-queue")
+    public ResponseEntity<java.util.Map<String, String>> stressLimitedQueue(
+            @RequestParam(defaultValue = "5") int requestsCount) {
+        String url = asyncLogisticsService.getDefaultNbuUrl();
+        for (int i = 0; i < requestsCount; i++) {
+            asyncLogisticsService.executeNetworkCheckInLimitedPool(url);
+        }
+        return ResponseEntity.ok(java.util.Map.of("status", "Queued " + requestsCount + " tasks"));
     }
 }

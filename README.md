@@ -1,20 +1,23 @@
-﻿# Лабораторна робота №4 — AOP (Aspect-Oriented Programming)
+﻿# Лабораторна робота №5 — Асинхронна обробка
 
-## Додані аспекти 
+## Реалізовані механізми асинхронності та їх пояснення
 
-### Перевірка активності сховища (`java_lab/annotation/VerifyActiveStorage.java` та `java_lab/aspect/ActiveStorageValidationAspect.java`)
+### Налаштування пулів потоків та обробка винятків (`java_lab/config/AsyncConfig.java`)
 
-Перед оформленням замовлення аспект перевіряє статус акаунта-сховища StorageAccount, до якого прив'язаний віртуальний актив. Якщо акаунт має статус FROZEN або BANNED, аспект блокує виконання методу proceed і викидає виняток IllegalArgumentException. Застосовано до методу create у класі DeliveryOrderService.
+У конфігурації визначено власний виконавець ThreadPoolTaskExecutor з обмеженими ресурсами, місткістю черги та префіксом назви потоків asset-async- для виконання основних асинхронних операцій. Окремо налаштовано ізольований малий пул limitedOverflowExecutor з одним потоком та одним місцем у черзі для відпрацювання сценаріїв перевантаження. Для методів із типом повернення void реалізовано AsyncUncaughtExceptionHandler, який перехоплює та фіксує помилки у фонових потоках.
 
-### Ідемпотентність запитів (`java_lab/annotation/IdempotentRequest.java` та `java_lab/aspect/IdempotencyAspect.java`)
+### Фонова генерація підписаних ZIP-квитанцій Fire-and-Forget (`java_lab/service/OrderLogisticsAsyncService.java` та `java_lab/service/DeliveryOrderService.java`)
 
-Аспект захищає від повторного створення однакових замовлень при дублюванні заголовка Idempotency-Key. Перший запит виконується і кешується, а при повторному запиті з тим самим ключем аспект одразу повертає закешований результат без повторного виклику методу. Застосовано до методу create у класі DeliveryOrderController.
+Метод generateSignedReceiptArchive виконується асинхронно у потоці пулу asset-async- без блокування основного запиту. Після збереження замовлення у методі create класу DeliveryOrderService у фоні формується текстова квитанція, обчислюється криптографічний підпис HmacSHA256 та створюється ZIP-архів на диску. Клієнт отримує відповідь одразу, не чекаючи завершення операцій вводу-виводу.
 
-### Маскування нікнеймів клієнтів (`java_lab/annotation/MaskCustomerTag.java` та `java_lab/aspect/CustomerTagMaskingAspect.java`)
+### Паралельне виконання запитів та об'єднання результатів (`java_lab/service/OrderLogisticsAsyncService.java` та `java_lab/service/DeliveryOrderService.java`)
 
-Після отримання списку замовлень аспект перевіряє роль поточного користувача. Якщо це звичайний USER, поле customerTag частково приховується, наприклад TEST_PLAYER перетворюється на TE*******ER. Якщо роль ADMIN, повертаються повні нікнейми без змін. Застосовано до методів getAll та getById у класі DeliveryOrderService. Для демонстрації проблеми самовиклику у класі DeliveryOrderService додано метод getAllViaSelfInvocation, який викликає this.getAll напряму всередині класу в обхід Spring-проксі, через що аспект не спрацьовує без жодних помилок.
+Два незалежні асинхронні методи fetchLiveUsdRateFromNbu та verifyKeycloakOidcHealth повертають CompletableFuture та виконують одночасні HTTP-запити до API Національного банку України та Keycloak OIDC. У методі calculateOrderSettlement класу DeliveryOrderService результати обох викликів об'єднуються через thenCombine у підсумковий фінансовий розрахунок замовлення. Очікування кожного Future обмежене в часі через orTimeout, а у разі тайм-ауту чи мережевого збою спрацьовують exceptionally та handle, повертаючи резервні значення без падіння запиту.
 
+### Обробка переповнення черги виконавця (`java_lab/exception/GlobalExceptionHandler.java` та `java_lab/controller/DeliveryOrderController.java`)
+
+У контролері DeliveryOrderController додано ендпоінти для отримання фінансового розрахунку замовлення та перевірки навантаження обмеженого пулу потоків. При надсиланні більшої кількості задач, ніж може вмістити малий пул та його черга, виникає TaskRejectedException. Цей виняток цілеспрямовано перехоплюється у GlobalExceptionHandler та повертає клієнту контрольовану відповідь зі статусом 503 Service Unavailable замість помилки 500.
 
 ### Тести
 
-`AspectsUnitTest.java` — модульні тести для всіх трьох аспектів 
+`AsyncProcessingTest.java` — модульні та інтеграційні тести з локальним HttpServer

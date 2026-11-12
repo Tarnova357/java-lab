@@ -13,6 +13,8 @@ target/
 .springBeans
 .sts4-cache
 
+
+receipts/
 ### IntelliJ IDEA ###
 .idea
 *.iws
@@ -36,3 +38,4 @@ build/
 *.log
 .DS_Store
 Thumbs.db
+

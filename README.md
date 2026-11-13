@@ -1,23 +1,23 @@
-﻿# Лабораторна робота №5 — Асинхронна обробка
+﻿# Лабораторна робота №6 — Quartz Scheduler
 
-## Реалізовані механізми асинхронності та їх пояснення
+## Реалізовані механізми планувальника
 
-### Налаштування пулів потоків та обробка винятків (`java_lab/config/AsyncConfig.java`)
+### Налаштування JDBC JobStore та міграція Liquibase (`application.yaml` та `db/changelog/quartz-tables.xml`)
 
-У конфігурації визначено власний виконавець ThreadPoolTaskExecutor з обмеженими ресурсами, місткістю черги та префіксом назви потоків asset-async- для виконання основних асинхронних операцій. Окремо налаштовано ізольований малий пул limitedOverflowExecutor з одним потоком та одним місцем у черзі для відпрацювання сценаріїв перевантаження. Для методів із типом повернення void реалізовано AsyncUncaughtExceptionHandler, який перехоплює та фіксує помилки у фонових потоках.
+У конфігурації Spring Boot увімкнено збереження розкладу в базі даних MySQL через `job-store-type: jdbc` із делегатом `StdJDBCDelegate` та параметром `initialize-schema: never`. Створення 11 системних таблиць `QRTZ_*` винесено в міграцію Liquibase `quartz-01-create-tables`, що гарантує збереження завдань і тригерів після перезапуску застосунку або деплою нової версії.
 
-### Фонова генерація підписаних ZIP-квитанцій Fire-and-Forget (`java_lab/service/OrderLogisticsAsyncService.java` та `java_lab/service/DeliveryOrderService.java`)
+### Конфігурація завдань, тригерів та часових поясів (`java_lab/config/QuartzSchedulerConfig.java`)
 
-Метод generateSignedReceiptArchive виконується асинхронно у потоці пулу asset-async- без блокування основного запиту. Після збереження замовлення у методі create класу DeliveryOrderService у фоні формується текстова квитанція, обчислюється криптографічний підпис HmacSHA256 та створюється ZIP-архів на диску. Клієнт отримує відповідь одразу, не чекаючи завершення операцій вводу-виводу.
+У єдиному класі конфігурації оголошено два біни `JobDetail` та три біни `Trigger` із явними іменами, групами та зв'язками через `JobKey` (завдання очищення замовлень має два тригери — періодичний `SimpleTrigger` та нічний `CronTrigger`). Базові параметри задано у `JobDataMap` завдання та перевизначено на рівні тригерів, для кожного тригера визначено власну інструкцію обробки пропусків (`misfire`), а для `CronTrigger` зафіксовано часовий пояс `Europe/Kyiv` із резервним переходом на `GMT` для невідомих ідентифікаторів.
 
-### Паралельне виконання запитів та об'єднання результатів (`java_lab/service/OrderLogisticsAsyncService.java` та `java_lab/service/DeliveryOrderService.java`)
+### Легкі класи завдань та стратегія повторного запуску (`java_lab/scheduler/job/PendingOrdersExpirationJob.java` та `java_lab/scheduler/job/StorageInventoryReportJob.java`)
 
-Два незалежні асинхронні методи fetchLiveUsdRateFromNbu та verifyKeycloakOidcHealth повертають CompletableFuture та виконують одночасні HTTP-запити до API Національного банку України та Keycloak OIDC. У методі calculateOrderSettlement класу DeliveryOrderService результати обох викликів об'єднуються через thenCombine у підсумковий фінансовий розрахунок замовлення. Очікування кожного Future обмежене в часі через orTimeout, а у разі тайм-ауту чи мережевого збою спрацьовують exceptionally та handle, повертаючи резервні значення без падіння запиту.
+Класи завдань позначено анотацією `@DisallowConcurrentExecution` для запобігання одночасному виконанню на тих самих даних. Вони не містять бізнес-логіки: перевіряють наявність і типи ключів у `mergedJobDataMap` (викидаючи явний `JobExecutionException` у разі помилки) та здійснюють один виклик відповідного сервісу Spring. У разі збою реалізовано повторний запуск з обмеженням до двох спроб через `context.getRefireCount()`, що виключає нескінченні цикли.
 
-### Обробка переповнення черги виконавця (`java_lab/exception/GlobalExceptionHandler.java` та `java_lab/controller/DeliveryOrderController.java`)
+### Ідемпотентні транзакційні сервіси (`java_lab/service/OrderMaintenanceService.java` та `java_lab/service/InventoryReportService.java`)
 
-У контролері DeliveryOrderController додано ендпоінти для отримання фінансового розрахунку замовлення та перевірки навантаження обмеженого пулу потоків. При надсиланні більшої кількості задач, ніж може вмістити малий пул та його черга, виникає TaskRejectedException. Цей виняток цілеспрямовано перехоплюється у GlobalExceptionHandler та повертає клієнту контрольовану відповідь зі статусом 503 Service Unavailable замість помилки 500.
+Бізнес-логіка та межі транзакцій (`@Transactional`) винесені на рівень сервісів: `OrderMaintenanceService` скасовує прострочені замовлення у статусі `PENDING` і повертає зарезервовану кількість віртуальних активів на баланс, а `InventoryReportService` формує щоденний звіт залишків на складі. Обидва сервіси реалізовані ідемпотентно, тому повторний запуск одразу після першого не змінює стан даних або файлів.
 
 ### Тести
 
-`AsyncProcessingTest.java` — модульні та інтеграційні тести з локальним HttpServer
+`QuartzSchedulerTest.java` — модульні тести для перевірки зв'язків JobKey, пріоритету параметрів JobDataMap, обробки відсутніх ключів, наявності @DisallowConcurrentExecution, інструкцій misfire, часових поясів, ідемпотентності обох сервісів та обмеження кількості повторних спроб при збоях
